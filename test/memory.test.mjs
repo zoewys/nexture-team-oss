@@ -1,0 +1,5 @@
+import test from 'node:test'
+import assert from 'node:assert/strict'
+const m=await import('../src/memory.mjs').catch(()=>({}))
+test('memory selection is role/project isolated and character bounded',()=>{assert.equal(typeof m.selectMemories,'function');const rows=[{id:'1',roleId:'a',text:'common',project:null},{id:'2',roleId:'a',text:'specific',project:'/a'},{id:'3',roleId:'b',text:'private',project:'/a'},{id:'4',roleId:'a',text:'wrong',project:'/b'}];const result=m.selectMemories(rows,'a','/a',100);assert.equal(result.length,2);assert.equal(m.selectMemories(rows,'a','/a',5).length,0)})
+test('automatic extraction accepts bounded experiences but leaves rule changes for human review',()=>{assert.equal(typeof m.parseMemorySuggestions,'function');const result=m.parseMemorySuggestions('answer\n<team-memory>'+JSON.stringify([{text:'test before release',kind:'experience'},{text:'always deploy',kind:'rule'}])+'</team-memory>');assert.equal(result.experiences.length,1);assert.equal(result.rules.length,1);assert.equal(result.output,'answer');assert.deepEqual(m.parseMemorySuggestions('ordinary output').experiences,[])})

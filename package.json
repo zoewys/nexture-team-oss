@@ -1,0 +1,69 @@
+{
+  "name": "nexture-team",
+  "version": "0.1.0-alpha.22",
+  "type": "module",
+  "description": "DSH roles, teams and private role memory with optional Nexture CLI integration",
+  "main": "src/plugin.mjs",
+  "exports": {
+    ".": "./src/plugin.mjs",
+    "./client": "./client/client.js",
+    "./cordis.patch.yml": "./cordis.patch.yml"
+  },
+  "engines": {
+    "node": ">=20",
+    "dsh": ">=0.2.1-rc.3 <1.0.0-0"
+  },
+  "scripts": {
+    "test": "node --test test/*.test.mjs",
+    "build": "node scripts/build-client.mjs",
+    "dev": "npm run build && node scripts/dev-server.mjs"
+  },
+  "dsh": {
+    "plugin": {
+      "name": "nexture-team"
+    },
+    "client": {
+      "inject": [
+        "@deepseek-ai/dsh-client-ui-layout",
+        "@deepseek-ai/dsh-client-ui-workspace",
+        "@deepseek-ai/dsh-client-ui-conversation",
+        "@deepseek-ai/dsh-client-ui-sidebar",
+        "@deepseek-ai/dsh-client-ui-input-trigger"
+      ],
+      "platform": "web"
+    },
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    }
+  },
+  "files": [
+    "src/*.mjs",
+    "client/client.js",
+    "cordis.patch.yml",
+    "README.md"
+  ],
+  "devDependencies": {
+    "esbuild": "0.28.2",
+    "react": "18.3.1",
+    "react-dom": "18.3.1"
+  },
+  "peerDependencies": {
+    "nexture-cli": ">=0.2.0-alpha.36 <0.3.0"
+  },
+  "peerDependenciesMeta": {
+    "nexture-cli": {
+      "optional": true
+    }
+  },
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/zoewys/nexture-team-oss.git"
+  },
+  "keywords": [
+    "dsh",
+    "dsh-plugin",
+    "deepseek-harness",
+    "nexture"
+  ]
+}

@@ -1,0 +1,18 @@
+node_modules/
+dist/
+coverage/
+.local/
+artifacts/
+.DS_Store
+*.tgz
+*.log
+.env
+.env.*
+!.env.example
+
+# Local role memory, task history and runtime state are not source code.
+.nexture-team/
+
+# Build outputs for DSH and the local preview.
+/client/client.js
+/client/dev.js
