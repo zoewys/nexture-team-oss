@@ -28,6 +28,9 @@ export function createHandler(service,{requestGate,catalog=async()=>({executions
       case 'reject':result=await service.reject(b.id,b.version,human);break
       case 'archiveRole':result=await service.archiveRole(b.roleId,b.version,human);break
       case 'promoteRole':result=await service.promoteRole(b.roleId,b.version,human);break
+      case 'saveRoleGroup':result=await service.saveRoleGroup(b,human);break
+      case 'moveRoles':result=await service.moveRoles(b,human);break
+      case 'deleteRoleGroup':result=await service.deleteRoleGroup(b.groupId,human);break
       case 'settings':result=await service.settings(b,human);break
       case 'memoryUpsert':result=await service.memoryUpsert(b.roleId,b.memory,human);break
       case 'memoryDelete':result=await service.memoryDelete(b.roleId,b.id,human);break

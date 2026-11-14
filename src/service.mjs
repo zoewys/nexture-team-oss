@@ -11,6 +11,7 @@ const copy=x=>structuredClone(x),now=()=>new Date().toISOString(),id=()=>randomU
 const required=(v,label,max=20000)=>{if(typeof v!=='string'||!v.trim()||v.length>max)throw new Error(`${label} required (max ${max})`);return v.trim()}
 const human=actor=>{if(actor?.kind!=='human')throw new Error('Only authenticated human confirmation is allowed')}
 const active=r=>r.status==='active'&&r.enabled
+const ungroupedName = '未分组'
 const terminal=new Set(['completed','failed','blocked','cancelled','interrupted'])
 const notifyTypes=new Set(['task.progress','task.completed','task.failed','task.blocked','task.interrupted','task.cancelled','plan.completed','plan.failed','plan.cancelled','plan.interrupted'])
 function event(d,type,plan,task,extra={}){
@@ -42,6 +43,7 @@ export class TeamService {
   async init(){
     await this.store.init(initial())
     await this.mutate(d=>{
+      d.roleGroups??=[]
       d.events??=[];d.eventSeq??=d.events.reduce((n,e)=>Math.max(n,e.seq||0),0)
       for(const p of d.plans){
         if(['pending','running'].includes(p.memoryStatus)){p.memoryStatus='pending';p.memoryError='宿主重启，增量记忆待恢复；未自动重新派发。'}
@@ -84,7 +86,7 @@ export class TeamService {
     return {planId:p.id,id:p.id,title:p.title,status:p.status,sourceSession:p.sourceSession,requests,memoryStatus:p.memoryStatus||'none',memoryError:p.memoryError||null,error:p.error||null,cursor:Math.max(0,...this.store.data.events.filter(e=>e.planId===p.id).map(e=>e.seq)),tasks:tasks.map(t=>({id:t.id,requestId:t.requestId,title:t.title,status:t.status,phase:t.phase||t.status,phaseSource:t.phaseSource||null,phaseSummary:t.phaseSummary||null,summary:t.summary??(t.output||'').slice(0,1200),error:t.error,outputFile:t.outputFile||null,outputLength:(t.output||'').length,nativeSession:t.nativeSession||null,nativeCleanup:t.nativeCleanup||null,usage:t.usage??null,artifacts:t.artifacts||[],result:t.result||null,...(fullOutput?{output:t.output||''}:{})}))}
   }
 
-  snapshot(sourceSession){const d=this.store.data;return copy({roles:d.roles,drafts:d.drafts.filter(x=>sourceSession===undefined||x.sourceSession===sourceSession),plans:d.plans.filter(x=>sourceSession===undefined||x.sourceSession===sourceSession),settings:d.settings})}
+  snapshot(sourceSession){const d=this.store.data;return copy({roles:d.roles,roleGroups:d.roleGroups,drafts:d.drafts.filter(x=>sourceSession===undefined||x.sourceSession===sourceSession),plans:d.plans.filter(x=>sourceSession===undefined||x.sourceSession===sourceSession),settings:d.settings})}
   role(roleId){const r=this.store.data.roles.find(x=>x.id===roleId);if(!r)throw new Error('Role not found');return copy(r)}
   plan(planId){const p=this.store.data.plans.find(x=>x.id===planId);if(!p)throw new Error('Plan not found');return copy(p)}
   draft(draftId){const d=this.store.data.drafts.find(x=>x.id===draftId)||this.store.data.plans.find(x=>x.id===draftId);if(!d)throw new Error('Draft not found');return copy(d)}
@@ -129,6 +131,53 @@ export class TeamService {
   async reject(draftId,version,actor){human(actor);return this.store.update(d=>{const item=d.drafts.find(x=>x.id===draftId)||d.plans.find(x=>x.id===draftId);if(!item||item.status!=='proposed'||item.version!==version)throw new Error('Draft version changed or 已处理');item.status='rejected';return item})}
   async archiveRole(roleId,version,actor){human(actor);return this.store.update(d=>{const r=d.roles.find(x=>x.id===roleId);if(!r||r.version!==version)throw new Error('Role version changed');if(r.builtin)throw new Error('内置角色请使用启停设置');if(d.plans.some(p=>p.status==='running'&&p.tasks.some(t=>t.roleId===roleId)))throw new Error('Role is running');r.status='archived';r.version++;return r})}
   async promoteRole(roleId,version,actor){human(actor);return this.store.update(d=>{const r=d.roles.find(x=>x.id===roleId);if(!r||r.version!==version)throw new Error('Role version changed');r.type='longterm';r.status='active';r.version++;return r})}
+  async saveRoleGroup({groupId, name}, actor) {
+    human(actor)
+    name = required(name, '分组名称', 60)
+    return this.store.update(state => {
+      const groups = state.roleGroups
+      if (name === ungroupedName || groups.some(group => group.id !== groupId && group.name.toLowerCase() === name.toLowerCase())) {
+        throw new Error('这个分组名称已被使用')
+      }
+      if (groupId === undefined) {
+        const group = {id: id(), name, roleIds: []}
+        groups.push(group)
+        return group
+      }
+      const group = groups.find(group => group.id === groupId)
+      if (!group) throw new Error('分组已不存在')
+      group.name = name
+      return group
+    })
+  }
+
+  async moveRoles({groupId, roleIds}, actor) {
+    human(actor)
+    if (!Array.isArray(roleIds) || !roleIds.length) throw new Error('请至少选择一个角色')
+    const selected = new Set(roleIds)
+    return this.store.update(state => {
+      const available = new Set(state.roles.filter(role => !role.builtin && role.status !== 'archived').map(role => role.id))
+      if ([...selected].some(roleId => !available.has(roleId))) throw new Error('有角色已归档或不存在，请刷新后重试')
+      const destination = state.roleGroups.find(group => group.id === groupId)
+      if (groupId !== null && !destination) throw new Error('分组已不存在')
+      for (const group of state.roleGroups) {
+        if (group === destination) group.roleIds = [...new Set([...group.roleIds, ...selected])]
+        else group.roleIds = group.roleIds.filter(roleId => !selected.has(roleId))
+      }
+      return {moved: selected.size}
+    })
+  }
+
+  async deleteRoleGroup(groupId, actor) {
+    human(actor)
+    return this.store.update(state => {
+      const index = state.roleGroups.findIndex(group => group.id === groupId)
+      if (index < 0) throw new Error('分组已不存在')
+      state.roleGroups.splice(index, 1)
+      return {id: groupId}
+    })
+  }
+
   async settings(values,actor){human(actor);return this.store.update(d=>{if(typeof values.memoryManagerEnabled!=='boolean')throw new Error('memoryManagerEnabled must be boolean');d.settings.memoryManagerEnabled=values.memoryManagerEnabled;return d.settings})}
   memories(roleId,project){this.role(roleId);const rows=this.store.data.memories.filter(m=>m.roleId===roleId&&(project===undefined||!m.project||m.project===project));return copy(rows)}
   async memoryUpsert(roleId,memory,actor){human(actor);this.role(roleId);const text=required(memory?.text,'记忆内容',2000);if(memory.project&&!isAbsolute(memory.project))throw new Error('Memory project must be absolute');return this.store.update(d=>{const old=memory.id?d.memories.find(m=>m.id===memory.id&&m.roleId===roleId):null;if(memory.id&&!old)throw new Error('Memory not found');const m={id:old?.id||id(),roleId,text,project:memory.project?resolve(memory.project):null,source:String(memory.source||old?.source||'manual').slice(0,300),kind:old?.kind||'experience',updatedAt:now()};if(old)d.memories[d.memories.indexOf(old)]=m;else d.memories.push(m);return m})}

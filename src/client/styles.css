@@ -145,3 +145,55 @@
 .nt-guide-foot>div{display:flex;gap:8px;margin-left:auto}
 .nt-guide-steps button:focus-visible{outline:2px solid var(--nt-green);outline-offset:2px}
 @media(max-width:480px){.nt-guide-copy{min-height:0}.nt-guide-copy h3{font-size:18px}}
+
+.nt-root .nt-role-toolbar { flex-wrap: wrap; }
+.nt-role-group { margin-block: 20px; }
+.nt-group-heading {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  width: 100%;
+  padding: 8px 0;
+  border: 0;
+  background: transparent;
+  color: var(--nt-ink);
+  text-align: start;
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+.nt-group-heading:not(:disabled) { cursor: pointer; }
+.nt-group-heading strong, .nt-group-manager-row > span, .nt-group-member > span { min-width: 0; overflow-wrap: anywhere; }
+.nt-group-heading span { color: var(--nt-muted); font-size: 11px; flex-shrink: 0; }
+.nt-group-empty { color: var(--nt-muted); font-size: 12px; margin: 4px 0 0 16px; }
+.nt-group-manager { display: grid; gap: 16px; }
+.nt-group-manager h3 { margin: 0; font-size: 13px; }
+.nt-group-manager-heading, .nt-group-manager-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.nt-group-manager-row {
+  margin-block-start: 8px;
+  padding-block-start: 8px;
+  border-top: 1px solid var(--nt-line);
+}
+.nt-group-manager-row .nt-actions { flex-shrink: 0; }
+.nt-group-editor {
+  display: grid;
+  gap: 10px;
+  margin-block-start: 10px;
+  padding-block-start: 12px;
+  border-top: 1px solid var(--nt-line);
+}
+.nt-group-members { display: grid; max-height: 220px; overflow-y: auto; }
+.nt-group-member {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) minmax(0, .65fr);
+  align-items: center;
+  gap: 8px;
+  padding-block: 7px;
+  border-bottom: 1px solid var(--nt-line);
+  cursor: pointer;
+}
+.nt-group-member small { color: var(--nt-muted); overflow-wrap: anywhere; }
