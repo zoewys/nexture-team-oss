@@ -11,11 +11,11 @@ Nexture Team 是一个 DeepSeek Harness（DSH）插件，用来建立可以跨�
 
 ## 演示视频
 
-在 DSH 中打开角色对话、为角色单独选模型，再看 Kimi Code 和 Codex 如何接入原生会话。
+查看团队角色、为角色保存独立模型，并打开角色自己的对话。
 
-<a href="https://raw.githubusercontent.com/zoewys/nexture-team-oss/main/docs/media/dsh-plugins-demo.mp4"><img src="docs/media/dsh-plugins-demo-cover.jpg" width="640" alt="播放 Nexture Team 与 External Agents 的 DSH 实录"></a>
+https://github.com/user-attachments/assets/ad6d6333-3386-48ba-aafb-cc2d0303f46d
 
-[观看演示（MP4，44 秒）](https://raw.githubusercontent.com/zoewys/nexture-team-oss/main/docs/media/dsh-plugins-demo.mp4)
+[下载 MP4（27 秒）](https://raw.githubusercontent.com/zoewys/nexture-team-oss/main/docs/media/nexture-team-demo.mp4)
 
 ## 安装
 
