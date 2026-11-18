@@ -9,6 +9,14 @@ Nexture Team 是一个 DeepSeek Harness（DSH）插件，用来建立可以跨�
 
 例如，先把功能实现交给开发角色，再让审查角色检查改动。下次进入这个工作区时，可以打开审查角色的对话，接着上次的讨论继续咨询。
 
+## 演示视频
+
+在 DSH 中打开角色对话、为角色单独选模型，再看 Kimi Code 和 Codex 如何接入原生会话。
+
+<a href="https://raw.githubusercontent.com/zoewys/nexture-team-oss/main/docs/media/dsh-plugins-demo.mp4"><img src="docs/media/dsh-plugins-demo-cover.jpg" width="640" alt="播放 Nexture Team 与 External Agents 的 DSH 实录"></a>
+
+[观看演示（MP4，44 秒）](https://raw.githubusercontent.com/zoewys/nexture-team-oss/main/docs/media/dsh-plugins-demo.mp4)
+
 ## 安装
 
 需要 Node.js 20 或更新版本，以及支持插件的 DSH（`>=0.2.1-rc.3 <1.0.0-0`）。
