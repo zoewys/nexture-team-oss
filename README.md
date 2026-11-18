@@ -13,9 +13,9 @@ Nexture Team 是一个 DeepSeek Harness（DSH）插件，用来建立可以跨�
 
 查看团队角色、为角色保存独立模型，并打开角色自己的对话。
 
-https://github.com/user-attachments/assets/ad6d6333-3386-48ba-aafb-cc2d0303f46d
+https://github.com/user-attachments/assets/e92a6b86-145b-450d-8fda-5dfe47c476b4
 
-[下载 MP4（27 秒）](https://raw.githubusercontent.com/zoewys/nexture-team-oss/main/docs/media/nexture-team-demo.mp4)
+[下载 MP4（13 秒，静音）](https://raw.githubusercontent.com/zoewys/nexture-team-oss/main/docs/media/nexture-team-demo.mp4)
 
 ## 安装
 
