@@ -4,6 +4,7 @@ import {randomUUID} from 'node:crypto'
 import {isAbsolute,resolve,join} from 'node:path'
 import {mkdir,writeFile} from 'node:fs/promises'
 import {Store} from './store.mjs'
+import {Conversations} from './conversations.mjs'
 import {selectMemories,parseMemorySuggestions} from './memory.mjs'
 import {assertDshProvider} from './execution-route.mjs'
 
@@ -39,9 +40,10 @@ function initial(){return {schema:1,roles:[
   {id:'builtin-memory',builtin:'memory',name:'记忆管理员',prompt:'整理指定角色的新增任务经验，去重并指出冲突。仅输出可复用且有来源的简短经验。把职责变化或长期规则列为 rule，等待用户确认；不把角色记忆转为团队共享，不执行任何项目修改。',type:'longterm'}
 ].map(r=>({...normalizeRole(r),id:r.id,builtin:r.builtin,status:'active',version:1,createdAt:now(),updatedAt:now()})),drafts:[],plans:[],memories:[],settings:{memoryManagerEnabled:true}}}
 export class TeamService {
-  constructor({stateDir,runtime,onEvent}={}){if(!stateDir)throw new Error('stateDir required');this.store=new Store(stateDir);this.runtime=runtime;this.onEvent=onEvent;this.running=new Map();this.memoryJobs=new Map();this.reconciliations=new Set();this.deliveries=new Map();this.waiters=new Set();this.consultations=new Set();this.closed=false}
+  constructor({stateDir,runtime,onEvent}={}){if(!stateDir)throw new Error('stateDir required');this.store=new Store(stateDir);this.runtime=runtime;this.onEvent=onEvent;this.running=new Map();this.memoryJobs=new Map();this.reconciliations=new Set();this.deliveries=new Map();this.waiters=new Set();this.consultations=new Set();this.closed=false;this.chats=new Conversations(this)}
   async init(){
     await this.store.init(initial())
+    await this.chats.init()
     await this.mutate(d=>{
       d.roleGroups??=[]
       d.events??=[];d.eventSeq??=d.events.reduce((n,e)=>Math.max(n,e.seq||0),0)
@@ -91,10 +93,17 @@ export class TeamService {
   plan(planId){const p=this.store.data.plans.find(x=>x.id===planId);if(!p)throw new Error('Plan not found');return copy(p)}
   draft(draftId){const d=this.store.data.drafts.find(x=>x.id===draftId)||this.store.data.plans.find(x=>x.id===draftId);if(!d)throw new Error('Draft not found');return copy(d)}
   matchRoles(query){const q=String(query||'').toLowerCase(),parts=q.split(/[\s，。、]+/).filter(Boolean);return copy(this.store.data.roles.filter(r=>active(r)&&!r.builtin).map(r=>({r,score:parts.reduce((n,t)=>n+(r.name+' '+r.prompt+' '+r.skills.join(' ')).toLowerCase().includes(t),0)})).filter(x=>x.score>0).sort((a,b)=>(b.r.type==='longterm')-(a.r.type==='longterm')||b.score-a.score).map(x=>x.r))}
-  async draftRole({role,roleId,sourceSession}={}){
+  async draftRole({role,roleId,roleVersion,sourceSession}={}){
     if(!role||typeof role!=='object')throw new Error('Role object required')
     if(!roleId&&(role.id||role.builtin||role.version))throw new Error('Role id and builtin identity are reserved')
-    return this.store.update(d=>{const base=roleId?d.roles.find(r=>r.id===roleId):null;if(roleId&&!base)throw new Error('Role not found');const draft={id:id(),kind:'role',status:'proposed',version:1,role:normalizeRole(role,base||{}),roleId:base?.id||null,roleVersion:base?.version||null,sourceSession:sourceSession||null,createdAt:now()};d.drafts.push(draft);return draft})
+    return this.store.update(d=>{
+      const base=roleId?d.roles.find(r=>r.id===roleId):null
+      if(roleId&&!base)throw new Error('Role not found')
+      if(roleVersion!==undefined&&base?.version!==roleVersion)throw new Error('角色已更新，请关闭后重新打开编辑。')
+      const draft={id:id(),kind:'role',status:'proposed',version:1,role:normalizeRole(role,base||{}),roleId:base?.id||null,roleVersion:base?.version||null,sourceSession:sourceSession||null,createdAt:now()}
+      d.drafts.push(draft)
+      return draft
+    })
   }
   async proposePlan({title,project,sourceSession,tasks,requests}={}){
     title=required(title,'任务标题',200);if(!isAbsolute(project||''))throw new Error('Project must be an absolute directory');project=resolve(project);sourceSession=required(sourceSession,'来源对话',200)
@@ -391,7 +400,7 @@ export class TeamService {
     }finally{clearTimeout(timer);this.waiters.delete(wake)}
   }
   async cancel(planId){const entry=this.running.get(planId);if(!entry)throw new Error('Task is not running');entry.controller.abort(new Error('用户取消任务'));await entry.job;return this.plan(planId)}
-  async consult(roleId,text,{sourceSession,project,signal}={}){
+  async consult(roleId,text,{sourceSession,project,signal,onSession}={}){
     if(this.closed)throw new Error('Team is shutting down')
     if(!this.runtime?.run)throw new Error('Execution runtime unavailable')
     const r=this.role(roleId);if(!active(r))throw new Error('Role inactive');if(!isAbsolute(project||''))throw new Error('Project must be absolute')
@@ -402,8 +411,8 @@ export class TeamService {
     const abort=()=>controller.abort(signal?.reason)
     signal?.addEventListener('abort',abort,{once:true});if(signal?.aborted)abort()
     this.consultations.add(entry)
-    entry.job=Promise.resolve().then(async()=>{if(controller.signal.aborted)throw new Error('Consultation aborted');const prepared=await this.runtime.prepare?.(plan,controller.signal);if(controller.signal.aborted)throw new Error('Consultation aborted');return this.runtime.run(task,{...this.context(task,plan),prepared,signal:controller.signal})}).finally(()=>{signal?.removeEventListener('abort',abort);this.consultations.delete(entry)})
+    entry.job=Promise.resolve().then(async()=>{if(controller.signal.aborted)throw new Error('Consultation aborted');const prepared=await this.runtime.prepare?.(plan,controller.signal);if(controller.signal.aborted)throw new Error('Consultation aborted');return this.runtime.run(task,{...this.context(task,plan),prepared,signal:controller.signal,onSession})}).finally(()=>{signal?.removeEventListener('abort',abort);this.consultations.delete(entry)})
     return entry.job
   }
-  async dispose(){this.closed=true;clearInterval(this.recoveryTimer);const entries=[...this.running.values(),...this.consultations,...this.memoryJobs.values(),...this.reconciliations];for(const x of entries)x.controller.abort(new Error('Team shutting down'));await Promise.allSettled(entries.map(x=>x.job));await this.recoveryScan;await Promise.allSettled([...this.deliveries.values()]);await this.store.close()}
+  async dispose(){this.closed=true;await this.chats.dispose();clearInterval(this.recoveryTimer);const entries=[...this.running.values(),...this.consultations,...this.memoryJobs.values(),...this.reconciliations];for(const x of entries)x.controller.abort(new Error('Team shutting down'));await Promise.allSettled(entries.map(x=>x.job));await this.recoveryScan;await Promise.allSettled([...this.deliveries.values()]);await this.store.close()}
 }

@@ -14,6 +14,8 @@ export function createHandler(service,{requestGate,catalog=async()=>({executions
     const token=req.headers['x-team-token'];if(!tokens.has(token)){send(res,403,{error:'请重新连接 Team 面板'});return}tokens.set(token,Date.now())
     if(req.method==='GET'){
       if(path===BASE+'/state')send(res,200,service.snapshot(url.searchParams.has('sourceSession')?url.searchParams.get('sourceSession'):undefined))
+      else if(path===BASE+'/conversations')send(res,200,{conversations:service.chats.list(url.searchParams.get('project'))})
+      else if(path===BASE+'/record')send(res,200,service.chats.record(url.searchParams.get('id'),url.searchParams.get('project')))
       else if(path===BASE+'/catalog')send(res,200,await catalog(url.searchParams.get('sourceSession')))
       else if(path===BASE+'/memory')send(res,200,{memories:service.memories(url.searchParams.get('roleId'),url.searchParams.has('project')?url.searchParams.get('project'):undefined)})
       else send(res,404,{error:'Unknown Team route'});return
@@ -23,6 +25,8 @@ export function createHandler(service,{requestGate,catalog=async()=>({executions
     const chunks=[];let bytes=0;for await(const chunk of req){bytes+=chunk.length;if(bytes>256*1024){send(res,413,{error:'Request too large'});return}chunks.push(chunk)}
     const b=JSON.parse(Buffer.concat(chunks).toString('utf8'));let result
     switch(b.action){
+      case 'openConversation':result=await service.chats.open(b.roleId,b);break
+      case 'sendMessage':result=await service.chats.send(b);break
       case 'draftRole':result=await service.draftRole(b);break
       case 'confirm':result=await service.confirm(b.id,b.version,human);break
       case 'reject':result=await service.reject(b.id,b.version,human);break

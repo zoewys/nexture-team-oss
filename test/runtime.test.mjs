@@ -247,10 +247,10 @@ test('CLI late startup rejection replaces pending cleanup with an actionable fai
 test('DSH current host uses caller-owned activation, childId, and approved context',async t=>{
  const f=dsh(t),signal=new AbortController().signal,ids=[]
  delete f.ctx.subagents.start
- f.ctx.subagents.startActivation=async spec=>{f.calls.push(spec);return {...f.run,id:undefined,childId:'modern-child'}}
+ f.ctx.subagents.startActivation=async spec=>{assert.equal(spec.parent?.id,'source-a','current host requires the exact parent at the activation top level');f.calls.push(spec);return {...f.run,id:undefined,childId:'modern-child'}}
  assert.equal(f.runtime.available(),true)
  const result=await f.runtime.run(task,{...context,signal,onSession:id=>ids.push(id)})
- assert.deepEqual(f.calls,[{provider:'spawn',label:role.name,signal,delivery:'caller',request:{parent:f.parent,prompt:[{type:'text',text:context.prompt}],agentOptions:{provider:task.provider,model:task.model},maxDepth:4}}])
+ assert.deepEqual(f.calls,[{provider:'spawn',label:role.name,signal,delivery:'caller',parent:f.parent,prompt:[{type:'text',text:context.prompt}],agentOptions:{provider:task.provider,model:task.model},maxDepth:4}])
  assert.deepEqual(result,{output:'done',nativeSession:'modern-child',stopReason:'completed',usage:null})
  assert.deepEqual(ids,['modern-child']);assert.equal(f.disposed.length,1)
 })
@@ -371,10 +371,25 @@ test('CLI preparation carries only the stored plan authorization in a detached s
 
 test('DSH rejects direct-chat providers before spawning, including inherited parent routes',async t=>{
  const f=dsh(t)
- for(const provider of ['nexture-codex-cli','nexture-codex-terminal','nexture-pi-terminal','nexture-claude-terminal','nexture-grok-terminal','nexture-agy-terminal','nexture-kimi-terminal']){
+ for(const provider of ['nexture-codex-cli','nexture-codex-terminal','nexture-pi-terminal','nexture-claude-terminal','nexture-grok-terminal','nexture-agy-terminal','nexture-kimi-terminal','external-acp-unknown']){
   await assert.rejects(f.runtime.run({...task,provider},context),/直接聊天|直聊/)
   f.parent.model={current:()=>({provider,model:'test-model'})}
   await assert.rejects(f.runtime.run({...task,model:'',provider:''},context),/直接聊天|直聊/)
  }
  assert.equal(f.calls.length,0)
+})
+
+test('Team can delegate with explicit or inherited Kimi Code and Codex ACP routes',async t=>{
+ const f=dsh(t)
+ f.ctx.subagents.startActivation=async spec=>{f.calls.push(spec);return {...f.run,childId:'modern-child'}}
+ for(const provider of ['external-acp-kimi-code','external-acp-codex']){
+  f.parent.model={current:()=>({provider,model:'test-model'})}
+  assert.equal((await f.runtime.run({...task,provider},context)).output,'done')
+  assert.deepEqual(f.calls.at(-1).agentOptions,{provider,model:task.model})
+  assert.equal((await f.runtime.run({...task,model:'',provider:''},context)).output,'done')
+  assert.equal(f.calls.at(-1).agentOptions,undefined)
+  assert.equal(f.calls.at(-1).parent,f.parent)
+  assert.deepEqual(f.calls.at(-1).prompt,[{type:'text',text:context.prompt}])
+ }
+ assert.equal(f.disposed.length,4)
 })

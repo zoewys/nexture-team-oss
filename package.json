@@ -1,6 +1,6 @@
 {
   "name": "nexture-team",
-  "version": "0.1.0-alpha.22",
+  "version": "0.1.0-alpha.25.1",
   "type": "module",
   "description": "DSH roles, teams and private role memory with optional Nexture CLI integration",
   "main": "src/plugin.mjs",

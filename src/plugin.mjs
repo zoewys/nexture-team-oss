@@ -52,10 +52,18 @@ export function apply(ctx,config={}){
   const retryTimer=setInterval(()=>{if(instance&&!closing)void instance.then(s=>s.retryPendingEvents()).catch(e=>ctx.logger?.warn?.(e.message))},30000);retryTimer.unref?.()
   const caller=exec=>{const h=exec?.agent?.session?.header;if(!h?.id)throw new Error('Calling DSH session required');return {sourceSession:h.id,project:h.cwd}}
   const original=(s,id,exec)=>{if(s.draft(id).sourceSession!==caller(exec).sourceSession)throw new Error('请在草案原对话中继续，或使用 Team 面板')}
-  const roleAccess=(s,roleId,exec)=>{const h=exec?.agent?.session?.header;if(h?.origin==='subagent'){const bound=s.snapshot().plans.flatMap(p=>p.tasks).find(t=>t.nativeSession===h.id);if(!bound||bound.roleId!==roleId)throw new Error('角色私有记忆不可跨角色读取或咨询')}}
+  const roleAccess=(s,roleId,exec)=>{const h=exec?.agent?.session?.header;if(h?.origin==='subagent'){const bound=s.chats.roleBinding(h.id)||s.snapshot().plans.flatMap(p=>p.tasks).find(t=>t.nativeSession===h.id);if(!bound||bound.roleId!==roleId)throw new Error('角色私有记忆不可跨角色读取或咨询')}}
   const catalog=async(includeModels=true)=>{
     const bridge=await getBridge(),available=await cli.available();let models=[],notice='',installed=[]
-    if(includeModels)try{const data=await ctx.sessionController.modelCatalog();models=data.groups?.filter(p=>!isDirectProvider(p.id)).flatMap(p=>(p.models||[]).map(m=>({execution:'dsh',provider:p.id,id:m.id,label:m.name||m.id})))||[]}catch(e){notice=e.message}
+    if(includeModels)try{
+      const data=await ctx.sessionController.modelCatalog()
+      models=data.groups?.filter(p=>!isDirectProvider(p.id)).flatMap(p=>{
+        const label=p.name||p.label
+        return (p.models||[]).map(m=>({
+          execution:'dsh',provider:p.id,id:m.id,label:m.name||m.id,...(label?{providerLabel:label}:{}),
+        }))
+      })||[]
+    }catch(e){notice=e.message}
     if(available&&includeModels)try{installed=await bridge.catalog?.()}catch(e){notice=[notice,e.message].filter(Boolean).join('；')}
     const kinds=bridge?.kinds||[],cliKinds=['pi','codex','claude','kimi']
     const rowAvailable=row=>row?.available===true||row?.available===undefined&&Boolean(row?.executable)
@@ -86,7 +94,7 @@ export function apply(ctx,config={}){
     ['team_run','Compatibility: start an approved plan once and briefly wait for new events (max 30s). Returns on progress; continue with team_wait using cursor. Never waits for the entire plan or retries uncertain execution.',{id:{type:'string'},requestId:{type:'string'},timeoutMs:{type:'integer',minimum:0,maximum:30000}},['id'],async(a,exec)=>{const s=await ready();original(s,a.id,exec);const current=s.plan(a.id);if(current.status==='approved')await s.start(a.id,{requestId:a.requestId});return s.wait(a.id,{after:s.result(a.id).cursor,timeoutMs:Math.min(a.timeoutMs??30000,30000)})}],
     ['team_status','Read compact plan state/result for this exact chat. Optional id selects one plan. Use team_wait for waiting and team_result fullOutput only when needed.',{id:{type:'string'}},[],async(a,exec)=>{const s=await ready();if(a.id){original(s,a.id,exec);return s.result(a.id)}return {plans:s.snapshot(caller(exec).sourceSession).plans.map(p=>s.result(p.id))}}],
     ['team_usage','Read reported parent-session usage separately from workers in this source chat. Unknown usage stays null; no character estimates or invented zeroes.',{},[],async(_a,exec)=>{const s=await ready(),source=caller(exec).sourceSession;return {parent:sessionUsage(exec.agent),workers:s.snapshot(source).plans.flatMap(p=>p.tasks.map(t=>({planId:p.id,taskId:t.id,requestId:t.requestId,nativeSession:t.nativeSession||null,usage:t.usage??null})))}}],
-    ['team_consult','Ask one role a question without project changes. Role creation helper returns questions/configuration suggestions; root chat asks the human and saves/confirms drafts. Actual execution requires a plan. roleId is stable ID from @ token/catalog.',{roleId:{type:'string'},text:{type:'string'}},['roleId','text'],async(a,exec)=>{const s=await ready();roleAccess(s,a.roleId,exec);const r=s.role(a.roleId);const result=await s.consult(r.id,a.text,{...caller(exec),signal:exec.signal});return {...result,output:result.output?.slice(0,32000)}}],
+    ['team_consult','Ask one role a question without project changes. Role creation helper returns questions/configuration suggestions; root chat asks the human and saves/confirms drafts. Actual execution requires a plan. roleId is stable ID from @ token/catalog.',{roleId:{type:'string'},text:{type:'string'}},['roleId','text'],async(a,exec)=>{const s=await ready();const session=caller(exec).sourceSession;if(s.chats.binding(session))return s.chats.contact(session,a.roleId,a.text);roleAccess(s,a.roleId,exec);const r=s.role(a.roleId);const result=await s.consult(r.id,a.text,{...caller(exec),signal:exec.signal});return {...result,output:result.output?.slice(0,32000)}}],
     ['team_memory','Read relevant existing memory for a role; this tool cannot save/delete or approve rules. A delegated role may read only its own memory. Use task final team-memory suggestions for automatic experiences.',{roleId:{type:'string'}},['roleId'],async(a,exec)=>{const s=await ready(),c=caller(exec);roleAccess(s,a.roleId,exec);return {memories:selectMemories(s.memories(a.roleId,c.project),a.roleId,c.project,6000)}}],
   ]
   const disposers=defs.map(([name,description,properties,required,execute])=>ctx.tools.register({name,description,parameters:{type:'object',properties,required,additionalProperties:false},output:{schema:{type:'string'},render:(_a,v)=>[{type:'text',text:String(v)}]},isConcurrencySafe:()=>true,timeoutMs:['team_start','team_wait','team_run','team_result','team_status','team_reconcile','team_retry_memory'].includes(name)?65000:360000,execute:async(a,exec)=>{if(closing)throw new Error('Team shutting down');return JSON.stringify(await execute(a,exec))}}))

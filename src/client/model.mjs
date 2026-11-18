@@ -8,6 +8,19 @@ export function roleFromForm(form) {
  return {name:form.name.trim(),type:form.type,prompt:form.prompt.trim(),skills:[...new Set((Array.isArray(form.skills)?form.skills:form.skills.split(/[,，\n]/)).map(s=>s.trim()).filter(Boolean))],execution:form.execution||'dsh',model:form.model?.trim()||'',provider:form.provider?.trim()||'',autoMemory:Boolean(form.autoMemory),enabled:form.enabled!==false}
 }
 export function taskFromRole(role) { return {roleId:role.id,title:'',prompt:'',execution:role.execution||'dsh',model:role.model||'',provider:role.provider||'',mode:'read',criteria:''} }
+const externalAgents = {
+ 'external-acp-kimi-code': '外部 Agent · Kimi Code',
+ 'external-acp-codex': '外部 Agent · Codex',
+}
+export function modelProviderLabel(provider, label) {
+ return externalAgents[provider] || label || provider
+}
+export function roleModelLabel(role) {
+ if (!role.execution || role.execution === 'dsh') {
+  return role.model ? [modelProviderLabel(role.provider), role.model].filter(Boolean).join(' · ') : '沿用主会话模型'
+ }
+ return role.model || '沿用默认模型'
+}
 export function insertRole(inputActions,role) {
  if(!inputActions?.captureInsertion||!inputActions?.insertText)return false
  return inputActions.insertText(`${roleMention(role)} `,inputActions.captureInsertion())===true

@@ -57,13 +57,14 @@ export class DshRuntime {
     const maxDepth = this.ctx.subagents.resolveMaxDepth?.()
     if (maxDepth !== undefined) request.maxDepth = maxDepth
     // The host validates provider capabilities and applies inherited authorization.
-    // Current hosts own child activations and return results to this caller.
+    // Current hosts take activation fields at the top level, own the child,
+    // and return its result to this caller; the exact live parent stays intact.
     // persona was removed from the new API: TeamService already includes the
     // approved role instructions, skills and private memory in prompt.
     const modern = typeof this.ctx.subagents.startActivation === 'function'
     const {signal: _signal,label: _label,persona: _persona,...activationRequest} = request
     const run = modern
-      ? await this.ctx.subagents.startActivation({provider:'spawn',label:role.name,request:activationRequest,signal,delivery:'caller'})
+      ? await this.ctx.subagents.startActivation({provider:'spawn',label:role.name,...activationRequest,signal,delivery:'caller'})
       : await this.ctx.subagents.start('spawn',request)
     const nativeSession = modern ? run.childId : run.id
     let failure, output = '',usage=null

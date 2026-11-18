@@ -16,6 +16,6 @@ export function createTeamApi(fetcher=(...args)=>fetch(...args),base='/nexture-t
   if(response.status===401||response.status===403)tokenPromise=undefined
   return read(response)
  }
- return {state:(session,options={})=>request(`/state${session?`?sourceSession=${encodeURIComponent(session)}`:''}`,options),catalog:options=>request('/catalog',options),memory:(roleId,project,options={})=>request(`/memory?roleId=${encodeURIComponent(roleId)}${project?`&project=${encodeURIComponent(project)}`:''}`,options),action:(action,params={})=>request('',{action,params})}
+ return {conversations:(project,options={})=>request(`/conversations?project=${encodeURIComponent(project)}`,options),record:(id,project,options={})=>request(`/record?id=${encodeURIComponent(id)}&project=${encodeURIComponent(project)}`,options),state:(session,options={})=>request(`/state${session?`?sourceSession=${encodeURIComponent(session)}`:''}`,options),catalog:options=>request('/catalog',options),memory:(roleId,project,options={})=>request(`/memory?roleId=${encodeURIComponent(roleId)}${project?`&project=${encodeURIComponent(project)}`:''}`,options),action:(action,params={})=>request('',{action,params})}
 }
 export const teamApi=createTeamApi()
