@@ -62,6 +62,30 @@ test('running role conversation exposes only scoped native tool activity before 
   assert.equal(current().messages.at(-1).text, '看过了')
 })
 
+test('role conversation reports Kimi quota failure from the native turn when DSH omits the diagnostic', async (t) => {
+  const parent = { session: { header: { id: 'parent', cwd: scope.project } } }
+  const message = 'Kimi Code 已达到当前 5 小时用量上限。'
+  const child = { session: { snapshotEvents: () => [{
+    type: 'turn/end',
+    data: { reason: { kind: 'error', error: { code: 'EXTERNAL_AGENT_QUOTA_EXHAUSTED', message } } }
+  }] } }
+  const s = await fixture(t, new DshRuntime({
+    agents: new Map([['parent', parent], ['child', child]]),
+    subagents: {
+      async startActivation() {
+        return { childId: 'child', result: Promise.resolve({ stopReason: 'error', output: [] }), dispose() {} }
+      }
+    }
+  }))
+  const role = s.snapshot().roles[0]
+  const sent = await s.chats.send({ roleId: role.id, text: '查看进度', requestId: 'quota', ...scope })
+  await s.chats.wait(sent.id)
+  const row = s.chats.list(scope.project)[0]
+  assert.equal(row.status, 'failed')
+  assert.equal(row.error, message)
+  assert.deepEqual(row.messages.map((entry) => entry.type), ['user'])
+})
+
 test('role conversations reuse identity, persist and reject duplicate/in-flight sends', async (t) => {
   let release,
     calls = 0

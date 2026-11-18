@@ -68,21 +68,37 @@ export class DshRuntime {
       ? await this.ctx.subagents.startActivation({provider:'spawn',label:role.name,...activationRequest,signal,delivery:'caller'})
       : await this.ctx.subagents.start('spawn',request)
     const nativeSession = modern ? run.childId : run.id
+    let childSession
+    const getChildSession = () => {
+      try { return childSession ??= this.ctx.agents?.get?.(nativeSession)?.session }
+      catch { return undefined }
+    }
     let failure, output = '',usage=null
     try {
       // Observe result rejection immediately, including when onSession itself fails.
       const pending = Promise.resolve(run.result)
       pending.catch(() => {})
       if (!nativeSession) throw new Error('DSH returned no child session identity')
+      if (modern) getChildSession()
       await onSession?.(nativeSession, () => {
-        const session = this.ctx.agents?.get?.(nativeSession)?.session
-        if (typeof session?.snapshotEvents === 'function') return dshActivity(session.snapshotEvents())
+        const events = getChildSession()?.snapshotEvents?.()
+        if (events) return dshActivity(events)
       })
       const result = await resultWithSignal(pending,signal)
       usage=result.usage??null
       output = (result.output ?? []).filter(item => item.type === 'text').map(item => item.text).join('\n')
       if (result.stopReason !== 'completed') {
-        const error = new Error(`DSH task ended with ${result.stopReason ?? 'unknown reason'}${result.diagnostic ? `: ${result.diagnostic}` : ''}`)
+        let quota
+        if (result.stopReason === 'error') {
+          // Current DSH activations omit the structured failure from the result.
+          try {
+            const reason = getChildSession()?.snapshotEvents?.()
+              ?.findLast(event => event.type === 'turn/end')?.data?.reason
+            if (reason?.kind === 'error' && reason.error?.code === 'EXTERNAL_AGENT_QUOTA_EXHAUSTED' &&
+              typeof reason.error.message === 'string') quota = reason.error.message
+          } catch {}
+        }
+        const error = new Error(quota || `DSH task ended with ${result.stopReason ?? 'unknown reason'}${result.diagnostic ? `: ${result.diagnostic}` : ''}`)
         Object.assign(error,{stopReason:result.stopReason,diagnostic:result.diagnostic,output})
         if (result.stopReason === 'aborted') error.name = 'AbortError'
         throw error
