@@ -25,7 +25,15 @@ export class Conversations {
     })
   }
   list(project) {
-    return copy(this.rows.filter((c) => c.project === project))
+    return copy(this.rows.filter((c) => c.project === project).map((c) => {
+      if (c.status !== 'sending') return c
+      // Observation is transient. A host that cannot report activity still serves the chat.
+      try {
+        const activity = this.jobs.get(c.id)?.getActivity?.()
+        if (activity) return { ...c, activity }
+      } catch {}
+      return c
+    }))
   }
   record(id, project) {
     const r = this.service.store.data.contactRecords.find((r) => r.id === id && r.project === project)
@@ -101,9 +109,10 @@ export class Conversations {
             sourceSession,
             project,
             signal: controller.signal,
-            onSession: (nativeSession) => {
+            onSession: (nativeSession, getActivity) => {
               this.live.set(nativeSession, { conversationId: c.id, roleId, project, sourceSession })
               entry.nativeSession = nativeSession
+              entry.getActivity = getActivity
             }
           }
         )

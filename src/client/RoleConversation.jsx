@@ -2,6 +2,7 @@ import React from 'react'
 import { Icon } from './icons.jsx'
 import { Avatar, RoleChips, executionLabel, enabled } from './RoleProfile.jsx'
 import { roleModelLabel } from './model.mjs'
+import { activityDetails, activityLabel } from './conversation-model.mjs'
 import Empty from './ConversationEmpty.jsx'
 const gate = '请先在 DSH 中添加工作区，再与角色对话。'
 export default function RoleConversation({
@@ -95,13 +96,16 @@ export default function RoleConversation({
           )
         )}
         {role && sending && (
-          <div className="sending-line" role="status">
-            <span className="dots">
-              <i />
-              <i />
-              <i />
+          <div className="sending-line">
+            <span className="activity-status" role="status">
+              <span className="dots" aria-hidden="true">
+                <i />
+                <i />
+                <i />
+              </span>
+              {activityLabel(conversation?.activity)}
             </span>
-            {role.name}正在回复…
+            <small>{activityDetails(conversation)}</small>
           </div>
         )}
         {conversation?.error && (

@@ -1,6 +1,7 @@
 import {realpath} from 'node:fs/promises'
 import {isAbsolute} from 'node:path'
 import {assertDshProvider} from './execution-route.mjs'
+import {dshActivity} from './dsh-activity.mjs'
 
 function abortError() {
   return Object.assign(new Error('DSH task cancelled'), {name:'AbortError',stopReason:'aborted'})
@@ -73,7 +74,10 @@ export class DshRuntime {
       const pending = Promise.resolve(run.result)
       pending.catch(() => {})
       if (!nativeSession) throw new Error('DSH returned no child session identity')
-      await onSession?.(nativeSession)
+      await onSession?.(nativeSession, () => {
+        const session = this.ctx.agents?.get?.(nativeSession)?.session
+        if (typeof session?.snapshotEvents === 'function') return dshActivity(session.snapshotEvents())
+      })
       const result = await resultWithSignal(pending,signal)
       usage=result.usage??null
       output = (result.output ?? []).filter(item => item.type === 'text').map(item => item.text).join('\n')

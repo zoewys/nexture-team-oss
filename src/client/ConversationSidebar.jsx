@@ -1,6 +1,7 @@
 import React from 'react'
 import { Icon } from './icons.jsx'
 import { Avatar, RoleChips, executionLabel, enabled } from './RoleProfile.jsx'
+import { activityLabel } from './conversation-model.mjs'
 export default function ConversationSidebar({
   resource,
   roles,
@@ -65,7 +66,7 @@ export default function ConversationSidebar({
                       </span>
                     </div>
                     <div className="conv-sum">
-                      {c.status === 'sending' ? '正在回复…' : last?.text || last?.summary || '开始新的对话'}
+                      {c.status === 'sending' ? activityLabel(c.activity) : last?.text || last?.summary || '开始新的对话'}
                     </div>
                   </div>
                 </button>

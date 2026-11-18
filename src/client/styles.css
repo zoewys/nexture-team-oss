@@ -284,7 +284,9 @@ html[data-platform="darwin"] [data-sidebar-collapsed] .nt-workspace .side-head {
 .nt-workspace .msg.user .m-col{align-items:flex-end}
 .nt-workspace .msg.user .bubble{background:var(--tint);border-radius:16px;border-top-right-radius:6px;padding:11px 15px;font-size:15px;line-height:1.7;white-space:pre-wrap;word-break:break-word}
 .nt-workspace .notice{display:flex;gap:9px;align-items:flex-start;background:var(--tint);border-left:3px solid var(--ink-3);border-radius:12px;padding:11px 14px;font-size:13px;color:var(--ink-2)}
-.nt-workspace .sending-line{display:flex;gap:8px;align-items:center;font-size:13px;color:var(--ink-2)}
+.nt-workspace .sending-line{display:flex;flex-wrap:wrap;column-gap:10px;row-gap:4px;align-items:center;font-size:13px;color:var(--ink-2)}
+.nt-workspace .activity-status{display:inline-flex;align-items:center;gap:8px}
+.nt-workspace .sending-line small{font-size:12px;color:var(--ink-2)}
 .nt-workspace .dots{display:inline-flex;gap:3px}
 .nt-workspace .dots i{width:5px;height:5px;border-radius:50%;background:var(--ink-2);animation:blink 1s infinite}
 .nt-workspace .dots i:nth-child(2){animation-delay:.2s}

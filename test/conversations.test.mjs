@@ -4,6 +4,7 @@ import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { TeamService } from '../src/service.mjs'
+import { DshRuntime } from '../src/dsh-runtime.mjs'
 async function fixture(t, runtime) {
   const dir = await mkdtemp(join(tmpdir(), 'team-chat-'))
   const s = await new TeamService({ stateDir: dir, runtime }).init()
@@ -14,6 +15,53 @@ async function fixture(t, runtime) {
   return s
 }
 const scope = { sourceSession: 'parent', project: process.cwd() }
+
+test('running role conversation exposes only scoped native tool activity before its reply', async (t) => {
+  const events = []
+  const parent = { session: { header: { id: 'parent', cwd: scope.project } } }
+  const child = { session: { snapshotEvents: () => events } }
+  let release
+  const result = new Promise((resolve) => { release = resolve })
+  const runtime = new DshRuntime({
+    agents: new Map([['parent', parent], ['child', child]]),
+    subagents: {
+      async startActivation() {
+        return { childId: 'child', result, dispose() {} }
+      }
+    }
+  })
+  const s = await fixture(t, runtime)
+  const role = s.snapshot().roles[0]
+  const sent = await s.chats.send({ roleId: role.id, text: '查看规格', requestId: 'activity', ...scope })
+  const current = () => s.chats.list(scope.project)[0]
+  const time = Date.now()
+  try {
+    // Wait for DshRuntime to resolve the project path and bind the child.
+    for (let attempt = 0; !s.chats.binding('child') && attempt < 50; attempt++) {
+      await new Promise((resolve) => setTimeout(resolve, 4))
+    }
+    assert.ok(s.chats.binding('child'))
+    events.push({ type: 'tool/call', time, data: { callId: 'read-1', name: 'read', arguments: '/private/internal' } })
+    assert.deepEqual(current().activity, { phase: 'tool', tool: 'read', toolCount: 1, at: time })
+    assert.equal(s.chats.list('/other').length, 0)
+
+    events.push({ type: 'approval/asked', time: time + 1, data: { id: 'approval-1' } })
+    assert.equal(current().activity.phase, 'approval')
+    events.push({ type: 'approval/decided', time: time + 2, data: { id: 'approval-1' } })
+    events.push({
+      type: 'tool/result', time: time + 3,
+      data: { message: { toolCallId: 'read-1', content: [{ type: 'text', text: 'internal tool output' }] } }
+    })
+    assert.deepEqual(current().activity, { phase: 'waiting', tool: 'read', toolCount: 1, at: time + 3 })
+    assert.deepEqual(current().messages.map((message) => message.type), ['user'])
+  } finally {
+    release({ stopReason: 'completed', output: [{ type: 'text', text: '看过了' }] })
+    await s.chats.wait(sent.id)
+  }
+  assert.equal(current().activity, undefined)
+  assert.equal(current().messages.at(-1).text, '看过了')
+})
+
 test('role conversations reuse identity, persist and reject duplicate/in-flight sends', async (t) => {
   let release,
     calls = 0
