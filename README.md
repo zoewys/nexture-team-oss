@@ -13,7 +13,7 @@ Nexture Team 是一个 DeepSeek Harness（DSH）插件，用来建立可以跨�
 
 展示如何与每个角色单独对话、切换并继续以前的聊天，以及角色配置、本地记忆、任务分工和多模型搭配。
 
-https://github.com/user-attachments/assets/90397028-3d88-41dd-98b4-5e8fe8210421
+https://github.com/user-attachments/assets/1022afba-8faf-4bd2-b5af-f06ecbb07698
 
 [下载 MP4（约 36 秒，静音）](https://raw.githubusercontent.com/zoewys/nexture-team-oss/main/docs/media/nexture-team-demo.mp4)
 
